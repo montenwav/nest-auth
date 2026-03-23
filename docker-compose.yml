@@ -1,0 +1,29 @@
+# version: '3.8'
+#
+services:
+  postgres:
+    image: postgres:13.5
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=nest
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+  test-postgres:
+    image: postgres:13.5
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=nest
+    volumes:
+      - test-postgres:/var/lib/postgresql/test-data
+    ports:
+      - '5435:5432'
+
+volumes:
+  postgres:
+  test-postgres:
