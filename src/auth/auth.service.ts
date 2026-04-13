@@ -24,8 +24,6 @@ export class AuthService {
         },
       });
 
-      delete user.hash;
-
       return user;
     } catch (err) {
       throw new ForbiddenException('Credentials taken');
@@ -33,33 +31,30 @@ export class AuthService {
   }
 
   async login(dto: LoginUserDto) {
-    const user = await this.prisma.user.findUnique({
+    const user = (await this.prisma.user.findUnique({
       where: { email: dto.email },
-    });
-
-    if (!user) {
-      throw new UnauthorizedException('user not found');
-    }
+    })) as any;
+    if (!user)
+      throw new UnauthorizedException(`User with email ${dto.email} not found`);
 
     const passCheck = await bcrypt.compare(dto.hash, user.hash);
-    if (!passCheck) {
-      return 'password is incorrect';
-    }
+    if (!passCheck) throw new UnauthorizedException('password is incorrect');
 
-    return this.signToken(user.id, user.email);
+    return this.signToken(user.id, user.email, user.roles);
   }
 
-  async signToken(id: number, email: string): Promise<{ token: string }> {
+  async signToken(
+    id: number,
+    email: string,
+    roles: string[]
+  ): Promise<{ token: string }> {
     const data = {
       sub: id,
       email,
+      roles,
     };
 
-    const jwtToken = await this.jwt.signAsync(data, {
-      expiresIn: '15m',
-      secret: process.env.JWT_SECRET,
-    });
-
+    const jwtToken = await this.jwt.signAsync(data);
     return { token: jwtToken };
   }
 }

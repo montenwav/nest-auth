@@ -3,7 +3,7 @@
 services:
   postgres:
     image: postgres:13.5
-    restart: unless-stopped
+    restart: no
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -14,7 +14,7 @@ services:
       - '5432:5432'
   test-postgres:
     image: postgres:13.5
-    restart: unless-stopped
+    restart: no
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres

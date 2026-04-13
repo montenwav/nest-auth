@@ -3,22 +3,22 @@ import { Test } from '@nestjs/testing';
 import { AppModule } from '../src/app.module';
 
 describe('AppController (e2e)', () => {
-  let app: INestApplication;
+    let app: INestApplication;
 
-  beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
+    beforeAll(async () => {
+        const moduleRef = await Test.createTestingModule({
+            imports: [AppModule],
+        }).compile();
 
-    app = moduleRef.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
+        app = moduleRef.createNestApplication();
+        app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
 
-    await app.init();
-  });
+        await app.init();
+    });
 
-  afterAll(() => {
-    app.close();
-  });
+    afterAll(() => {
+        app.close();
+    });
 
-  it.todo('aboba');
+    it.todo('aboba');
 });
