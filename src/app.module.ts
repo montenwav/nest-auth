@@ -1,21 +1,23 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
-import { LoggerMiddleware } from './middleware/LoggerMiddleware';
-import { APP_GUARD } from '@nestjs/core';
-import { AuthGuard } from './auth/guards';
+import { TokenModule } from './token/token.module';
+import { UserModule } from './user/user.module';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
-  imports: [PrismaModule, AuthModule],
-  // providers: [
-  //   {
-  //     provide: APP_GUARD,
-  //     useClass: AuthGuard,
-  //   },
-  // ],
+  imports: [
+    JwtModule.register({ global: true }),
+    PrismaModule,
+    AuthModule,
+    TokenModule,
+    UserModule,
+  ],
+  providers: [
+    // {
+    //   provide: APP_GUARD,
+    //   useClass: AuthGuard,
+    // },
+  ],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
-    consumer.apply(LoggerMiddleware).forRoutes('*');
-  }
-}
+export class AppModule { }

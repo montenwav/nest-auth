@@ -3,58 +3,64 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/CreateUser.dto';
 import * as bcrypt from 'bcrypt';
-import { JwtService } from '@nestjs/jwt';
 import { LoginUserDto } from './dto/LoginUser.dto';
+import { Response, Request } from 'express';
+import { jwtPayloadType, TokenService } from 'src/token/token.service';
+import { UserService } from 'src/user/user.service';
 
 @Injectable()
 export class AuthService {
-  constructor(private prisma: PrismaService, private jwt: JwtService) { }
+  constructor(private token: TokenService, private user: UserService) { }
 
   async register(dto: CreateUserDto) {
     try {
       const hashedPass = await bcrypt.hash(dto.hash, 10);
-
-      const user = await this.prisma.user.create({
-        data: {
-          email: dto.email,
-          hash: hashedPass,
-        },
-      });
-
+      const user = await this.user.createUser(dto, hashedPass);
       return user;
     } catch (err) {
       throw new ForbiddenException('Credentials taken');
     }
   }
 
-  async login(dto: LoginUserDto) {
-    const user = (await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    })) as any;
-    if (!user)
-      throw new UnauthorizedException(`User with email ${dto.email} not found`);
-
-    const passCheck = await bcrypt.compare(dto.hash, user.hash);
-    if (!passCheck) throw new UnauthorizedException('password is incorrect');
-
-    return this.signToken(user.id, user.email, user.roles);
+  async refresh(res: Response, req: Request) {
+    const { refreshToken, payload } = await this.token.verifyToken(req);
+    // revoke old token and sign new
+    const { accessToken } = await this.token.signToken(
+      res,
+      payload,
+      refreshToken
+    );
+    return { accessToken };
   }
 
-  async signToken(
-    id: number,
-    email: string,
-    roles: string[]
-  ): Promise<{ token: string }> {
-    const data = {
-      sub: id,
-      email,
-      roles,
+  async login(res: Response, dto: LoginUserDto) {
+    // user check
+    const user = await this.user.getUserByEmail(dto);
+    const passCheck = await bcrypt.compare(dto.hash, user.hash);
+    if (!passCheck) throw new UnauthorizedException('Password is incorrect');
+
+    // send tokens
+    const data: jwtPayloadType = {
+      sub: user.id,
+      email: user.email,
+      roles: user.roles,
     };
 
-    const jwtToken = await this.jwt.signAsync(data);
-    return { token: jwtToken };
+    const { accessToken } = await this.token.signToken(res, data);
+    return { accessToken };
+  }
+
+  async logout(res: Response, req: Request) {
+    // remove old token and clear cookies
+    const { refreshToken, payload } = await this.token.verifyToken(req);
+    await this.token.removeToken(res, refreshToken, payload.sub);
+
+    res.clearCookie(`refreshToken`, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+    });
   }
 }

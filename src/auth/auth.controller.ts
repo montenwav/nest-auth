@@ -1,17 +1,32 @@
-import { Body, Controller, Get, Post, UseGuards, Param } from '@nestjs/common';
-import { User } from '@prisma/client';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  UseGuards,
+  Param,
+  Req,
+  Res,
+} from '@nestjs/common';
+import { Roles, User } from '@prisma/client';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from './dto/CreateUser.dto';
 import { LoginUserDto } from './dto/LoginUser.dto';
 import { FindUserPipe } from './pipes/FindUserPipe';
-import { Roles, RolesEnum } from './roles/roles.decorator';
 import { AuthGuard } from './guards';
 import { RolesGuard } from './guards/roles.guard';
+import { Response, Request } from 'express';
+import { RolesDecorator } from './roles/roles.decorator';
 
-@Roles(RolesEnum.USER)
+@RolesDecorator(Roles.USER)
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) { }
+
+  @Get('refresh')
+  refresh(@Res() res: Response, @Req() req: Request) {
+    return this.authService.refresh(res, req);
+  }
 
   @Post('register')
   register(@Body() dto: CreateUserDto) {
@@ -19,19 +34,24 @@ export class AuthController {
   }
 
   @Post('login')
-  login(@Body() dto: LoginUserDto) {
-    return this.authService.login(dto);
+  login(@Res() res: Response, @Body() dto: LoginUserDto) {
+    return this.authService.login(res, dto);
   }
 
+  @Post('logout')
+  logout(@Res() res: Response, @Req() req: Request) {
+    return this.authService.logout(res, req);
+  }
+
+  @RolesDecorator(Roles.ADMIN)
   @UseGuards(AuthGuard, RolesGuard)
-  @Roles(RolesEnum.ADMIN)
   @Get('user')
   getUser() {
     return `super secret info`;
   }
 
+  @RolesDecorator(Roles.ADMIN)
   @UseGuards(AuthGuard, RolesGuard)
-  @Roles(RolesEnum.ADMIN)
   @Get('find/:id')
   findUser(@Param('id', FindUserPipe) user: User) {
     return user;
