@@ -1,8 +1,4 @@
-import {
-  HttpException,
-  UnauthorizedException,
-  Injectable,
-} from '@nestjs/common';
+import { UnauthorizedException, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Request, Response } from 'express';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -13,6 +9,8 @@ export interface jwtPayloadType {
   sub: number;
   email: string;
   roles: Roles[];
+  exp?: string;
+  iat?: string;
 }
 
 @Injectable()
@@ -28,7 +26,8 @@ export class TokenService {
       select: { refreshTokens: true },
     });
     if (!tokens) throw new UnauthorizedException(`Token not found`);
-    return tokens.refreshTokens; // get values from refreshTokens field
+    // get values from refreshTokens field
+    return tokens.refreshTokens;
   }
 
   async createToken(refreshToken: string, id: number) {
@@ -54,41 +53,45 @@ export class TokenService {
   }
 
   async handleTokenReuse(res: Response, refreshToken: string, id: number) {
-    // compare
     const tokens = await this.getTokensById(id);
-    let tokenId = -1;
     const now = new Date();
-
+    let matchedToken: RefreshTokens | null = null;
+    // Compare
     for (const token of tokens) {
-      if (
-        (await bcrypt.compare(refreshToken, token.tokenHash || '')) &&
-        token.revokedAt == null &&
-        token.expiresAt > now
-      ) {
-        tokenId = token.id;
+      if (await bcrypt.compare(refreshToken, token.tokenHash || '')) {
+        matchedToken = token;
+        break;
       }
     }
+
+    // JWT checks
+    if (!matchedToken) throw new UnauthorizedException('Token not found');
+    if (matchedToken.expiresAt < now)
+      throw new UnauthorizedException('Token expired');
     // If token not found there's a possibility that token was stolen,
-    // so we revoke tokens and re-login user
-    if (tokenId < 0) {
-      await this.prisma.refreshTokens.updateMany({
-        where: { userId: id },
+    // so we revoke old token and re-login user
+    if (matchedToken && matchedToken.revokedAt !== null) {
+      await this.prisma.refreshTokens.update({
+        where: { id: matchedToken.id },
         data: { revokedAt: new Date() },
       });
       res.clearCookie(`refreshToken`, {
         httpOnly: true,
-        secure: true,
-        sameSite: 'strict',
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
       });
 
-      throw new UnauthorizedException();
+      throw new UnauthorizedException('Token reuse activity');
     }
-    return tokenId;
+    return matchedToken.id;
   }
 
   async verifyToken(req: Request) {
-    const refreshToken = req.cookies[`refreshToken`];
-    if (!refreshToken) throw new UnauthorizedException('Refresh token missing');
+    const refreshToken = req.cookies['refreshToken'];
+    if (!refreshToken)
+      throw new UnauthorizedException(
+        'field refreshToken missing in your cookies'
+      );
     let payload: jwtPayloadType;
 
     try {
@@ -96,9 +99,7 @@ export class TokenService {
         secret: process.env.JWT_SECRET_REFRESH,
       });
     } catch (err) {
-      throw new UnauthorizedException(
-        `There's no refreshToken in your cookies`
-      );
+      throw new UnauthorizedException('Token is not valid');
     }
     return { refreshToken, payload };
   }
@@ -109,12 +110,14 @@ export class TokenService {
     oldRefreshToken?: string
   ): Promise<{ accessToken: string }> {
     // generate new tokens
-    const newRefreshToken = await this.jwt.signAsync(payload, {
+    const { exp, iat, ...cleanPayload } = payload;
+
+    const newRefreshToken = await this.jwt.signAsync(cleanPayload, {
       secret: process.env.JWT_SECRET_REFRESH,
       expiresIn: '7d',
     });
 
-    const accessToken = await this.jwt.signAsync(payload, {
+    const accessToken = await this.jwt.signAsync(cleanPayload, {
       secret: process.env.JWT_SECRET_ACCESS,
       expiresIn: '15m',
     });
@@ -127,8 +130,8 @@ export class TokenService {
     // send tokens to user
     res.cookie('refreshToken', newRefreshToken, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
     return { accessToken };

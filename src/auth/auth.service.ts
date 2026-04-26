@@ -32,7 +32,7 @@ export class AuthService {
       payload,
       refreshToken
     );
-    return { accessToken };
+    res.status(201).json({ accessToken });
   }
 
   async login(res: Response, dto: LoginUserDto) {
@@ -40,7 +40,6 @@ export class AuthService {
     const user = await this.user.getUserByEmail(dto);
     const passCheck = await bcrypt.compare(dto.hash, user.hash);
     if (!passCheck) throw new UnauthorizedException('Password is incorrect');
-
     // send tokens
     const data: jwtPayloadType = {
       sub: user.id,
@@ -49,7 +48,7 @@ export class AuthService {
     };
 
     const { accessToken } = await this.token.signToken(res, data);
-    return { accessToken };
+    res.json({ accessToken });
   }
 
   async logout(res: Response, req: Request) {
@@ -59,8 +58,9 @@ export class AuthService {
 
     res.clearCookie(`refreshToken`, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
     });
+    res.json({ message: 'You successfully logged out' });
   }
 }

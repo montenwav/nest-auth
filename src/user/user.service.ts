@@ -3,7 +3,7 @@ import {
   HttpException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { User } from '@prisma/client';
+import { RefreshTokens, User } from '@prisma/client';
 import { CreateUserDto } from 'src/auth/dto/CreateUser.dto';
 import { LoginUserDto } from 'src/auth/dto/LoginUser.dto';
 import { PrismaService } from 'src/prisma/prisma.service';

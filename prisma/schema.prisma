@@ -26,8 +26,6 @@ model RefreshTokens {
 
   userId Int
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("tokens")
 }
 
 model User {
