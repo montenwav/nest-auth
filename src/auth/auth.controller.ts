@@ -4,15 +4,13 @@ import {
   Get,
   Post,
   UseGuards,
-  Param,
   Req,
   Res,
 } from '@nestjs/common';
-import { Roles, User } from '@prisma/client';
+import { Roles } from '@prisma/client';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from './dto/CreateUser.dto';
 import { LoginUserDto } from './dto/LoginUser.dto';
-import { FindUserPipe } from './pipes/FindUserPipe';
 import { AuthGuard } from './guards';
 import { RolesGuard } from './guards/roles.guard';
 import { Response, Request } from 'express';
@@ -53,12 +51,5 @@ export class AuthController {
   @Get('user')
   getUser() {
     return `super secret info`;
-  }
-
-  @RolesDecorator(Roles.ADMIN)
-  @UseGuards(AuthGuard, RolesGuard)
-  @Get('find/:id')
-  findUser(@Param('id', FindUserPipe) user: User) {
-    return user;
   }
 }

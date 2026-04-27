@@ -9,10 +9,15 @@ import { LoginUserDto } from './dto/LoginUser.dto';
 import { Response, Request } from 'express';
 import { jwtPayloadType, TokenService } from 'src/token/token.service';
 import { UserService } from 'src/user/user.service';
+import { SessionService } from 'src/session/session.service';
 
 @Injectable()
 export class AuthService {
-  constructor(private token: TokenService, private user: UserService) { }
+  constructor(
+    private session: SessionService,
+    private token: TokenService,
+    private user: UserService
+  ) { }
 
   async register(dto: CreateUserDto) {
     try {
@@ -67,7 +72,7 @@ export class AuthService {
     const platform = req.headers['user-agent'];
     const { payload } = await this.token.verifyToken(req);
 
-    await this.token.removeToken(payload, platform, killDevice);
+    await this.session.removeToken(payload, platform, killDevice);
 
     res.clearCookie(`refreshToken`, {
       httpOnly: true,
