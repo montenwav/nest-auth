@@ -25,36 +25,47 @@ export class AuthService {
   }
 
   async refresh(res: Response, req: Request) {
+    const platform = req.headers['user-agent'];
+
     const { refreshToken, payload } = await this.token.verifyToken(req);
     // revoke old token and sign new
     const { accessToken } = await this.token.signToken(
       res,
       payload,
+      platform,
       refreshToken
     );
+    // we use express res instead of return, we need to send response manually
     res.status(201).json({ accessToken });
   }
 
-  async login(res: Response, dto: LoginUserDto) {
+  async login(res: Response, req: Request, dto: LoginUserDto) {
+    const platform = req.headers['user-agent'];
     // user check
     const user = await this.user.getUserByEmail(dto);
     const passCheck = await bcrypt.compare(dto.hash, user.hash);
     if (!passCheck) throw new UnauthorizedException('Password is incorrect');
-    // send tokens
+
+    if (platform) await this.user.writePlatform(platform, user.id);
+
+    // send tokens to user
     const data: jwtPayloadType = {
       sub: user.id,
       email: user.email,
       roles: user.roles,
     };
 
-    const { accessToken } = await this.token.signToken(res, data);
+    // we don't send refresh token on login because we don't have it on that stage
+    const { accessToken } = await this.token.signToken(res, data, platform);
     res.json({ accessToken });
   }
 
-  async logout(res: Response, req: Request) {
+  async logout(res: Response, req: Request, killDevice: boolean = false) {
     // remove old token and clear cookies
-    const { refreshToken, payload } = await this.token.verifyToken(req);
-    await this.token.removeToken(res, refreshToken, payload.sub);
+    const platform = req.headers['user-agent'];
+    const { payload } = await this.token.verifyToken(req);
+
+    await this.token.removeToken(payload, platform, killDevice);
 
     res.clearCookie(`refreshToken`, {
       httpOnly: true,

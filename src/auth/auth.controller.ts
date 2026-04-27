@@ -34,13 +34,18 @@ export class AuthController {
   }
 
   @Post('login')
-  login(@Res() res: Response, @Body() dto: LoginUserDto) {
-    return this.authService.login(res, dto);
+  login(@Res() res: Response, @Req() req: Request, @Body() dto: LoginUserDto) {
+    return this.authService.login(res, req, dto);
   }
 
   @Get('logout')
   logout(@Res() res: Response, @Req() req: Request) {
     return this.authService.logout(res, req);
+  }
+
+  @Get('logout-device')
+  logoutDevice(@Res() res: Response, @Req() req: Request) {
+    return this.authService.logout(res, req, true);
   }
 
   @RolesDecorator(Roles.ADMIN)

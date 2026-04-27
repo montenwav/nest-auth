@@ -20,9 +20,11 @@ model RefreshTokens {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt()
 
+  platform  String?
   expiresAt DateTime
   revokedAt DateTime?
   tokenHash String?
+  jti       String    @unique()
 
   userId Int
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -35,10 +37,11 @@ model User {
 
   refreshTokens RefreshTokens[]
 
-  roles    Roles[] @default([USER])
-  fullname String?
-  email    String  @unique()
-  hash     String
+  platforms String[]
+  roles     Roles[]  @default([USER])
+  fullname  String?
+  email     String   @unique()
+  hash      String
 
   bookmarks Bookmark[]
 

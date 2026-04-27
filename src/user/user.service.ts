@@ -3,7 +3,7 @@ import {
   HttpException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { RefreshTokens, User } from '@prisma/client';
+import { User } from '@prisma/client';
 import { CreateUserDto } from 'src/auth/dto/CreateUser.dto';
 import { LoginUserDto } from 'src/auth/dto/LoginUser.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -34,10 +34,28 @@ export class UserService {
       data: {
         email: dto.email,
         hash,
+        platforms: [],
       },
     });
     if (!user)
       throw new UnauthorizedException(`User with email ${dto.email} not found`);
     return user;
+  }
+
+  async writePlatform(platform: string, id: number) {
+    // get platform and rewrite platforms field in DB
+    const platformsObj = await this.prisma.user.findUnique({
+      where: { id },
+      select: { platforms: true },
+    });
+    const platforms = platformsObj?.platforms;
+
+    if (platforms) {
+      platformsObj.platforms.push(platform);
+      await this.prisma.user.update({
+        where: { id },
+        data: { platforms },
+      });
+    }
   }
 }
