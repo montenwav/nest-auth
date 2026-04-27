@@ -50,7 +50,7 @@ export class UserService {
     });
     const platforms = platformsObj?.platforms;
 
-    if (platforms) {
+    if (platforms && !platforms.includes(platform)) {
       platformsObj.platforms.push(platform);
       await this.prisma.user.update({
         where: { id },

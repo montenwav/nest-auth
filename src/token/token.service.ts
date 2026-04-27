@@ -50,7 +50,6 @@ export class TokenService {
   ) {
     const tokenHash = await bcrypt.hash(refreshToken, 10);
     const expirationTime = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    console.log(payload.jti);
 
     await this.prisma.refreshTokens.create({
       data: {
@@ -85,14 +84,9 @@ export class TokenService {
     }
   }
 
-  async handleTokenReuse(
-    res: Response,
-    refreshToken: string,
-    payload: jwtPayloadType
-  ) {
+  async handleTokenReuse(refreshToken: string, payload: jwtPayloadType) {
     // JWT checks
     const tokens = await this.getTokensById(payload.sub);
-    const now = new Date();
     // If token not passsed compare stage there's a possibility that token was stolen,
     // so we revoke old token and re-login user
 
@@ -109,32 +103,6 @@ export class TokenService {
       );
       if (!isValid) throw new ForbiddenException('Token not found');
     }
-
-    console.log(matchedToken.revokedAt);
-    // for (const token of tokens) {
-    //   console.log(token.tokenHash);
-    //   token.jti == payload.jti;
-    // if (await bcrypt.compare(refreshToken, token.tokenHash || '')) {
-    //   matchedToken = token;
-    //   break;
-    // }
-    // }
-
-    // if (matchedToken.revokedAt != null) {
-    // await this.prisma.refreshTokens.update({
-    //   where: { id: matchedToken.id },
-    //   data: { revokedAt: new Date() },
-    // });
-
-    // res.clearCookie(`refreshToken`, {
-    //   httpOnly: true,
-    //   secure: process.env.NODE_ENV === 'production',
-    //   sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
-    // });
-    //
-    //   throw new UnauthorizedException('Token reuse activity');
-    // }
-    return matchedToken.id;
   }
 
   async verifyToken(req: Request) {
@@ -153,6 +121,7 @@ export class TokenService {
     } catch (err) {
       throw new UnauthorizedException('Token is not valid');
     }
+
     return { refreshToken, payload };
   }
 

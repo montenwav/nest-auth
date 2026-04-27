@@ -28,6 +28,8 @@ export class AuthService {
     const platform = req.headers['user-agent'];
 
     const { refreshToken, payload } = await this.token.verifyToken(req);
+    await this.token.handleTokenReuse(refreshToken, payload);
+
     // revoke old token and sign new
     const { accessToken } = await this.token.signToken(
       res,
