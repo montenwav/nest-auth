@@ -3,10 +3,11 @@ import {
   HttpException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { User } from '@prisma/client';
-import { CreateUserDto } from 'src/auth/dto/CreateUser.dto';
-import { LoginUserDto } from 'src/auth/dto/LoginUser.dto';
+import { Account, AuthProviders, User } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
+import * as bcrypt from 'bcrypt';
+import { CreateUserType } from 'src/auth/types/createUser.type';
+import { OAuthProfileType } from 'src/auth/types/oAuthProfile.type';
 
 @Injectable()
 export class UserService {
@@ -15,47 +16,105 @@ export class UserService {
   async getUserById(id: number): Promise<User> {
     const user = await this.prisma.user.findUnique({
       where: { id },
+      include: { accounts: true },
     });
     if (!user) throw new HttpException('User not found', 404);
     return user;
   }
 
-  async getUserByEmail(dto: LoginUserDto): Promise<User> {
+  async getUserByEmail(email: string): Promise<User | null> {
     const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+      where: { email },
+      include: { accounts: true },
     });
-    if (!user)
-      throw new UnauthorizedException(`User with email ${dto.email} not found`);
-    return user;
+    return user ?? null;
   }
 
-  async createUser(dto: CreateUserDto, hash: string): Promise<User> {
+  async getAccountByProviderId(
+    provider: string,
+    providerId: string
+  ): Promise<Account | null> {
+    let account: Account | null = null;
+    try {
+      account = await this.prisma.account.findFirstOrThrow({
+        where: { AND: [{ provider }, { providerId }] },
+        include: { user: true },
+      });
+    } catch {
+      // Forbid credentials when there's OAuth account
+      if (provider === 'CREDENTIALS')
+        throw new UnauthorizedException(
+          'Credentials taken, use Google/GitHub instead'
+        );
+      return null;
+    }
+    return account;
+  }
+
+  async createUser(dto: CreateUserType): Promise<User> {
+    let hash: string | null = null;
+    if (dto.password) {
+      hash = await bcrypt.hash(dto.password, 10);
+    }
+
+    // Because we don't have password in OAuth
+    const accountType = {
+      provider: dto.password ? 'CREDENTIALS' : dto.provider,
+      providerId: dto.password ? dto.email : dto.providerId,
+    };
+
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,
         hash,
-        platforms: [],
+        picture: dto.picture,
+        isVerified: dto.isEmailVerified,
+        fullname: dto.fullname,
+        accounts: {
+          create: [accountType],
+        },
+        methods: [dto.provider || AuthProviders.CREDENTIALS],
       },
+      include: { accounts: true },
     });
-    if (!user)
-      throw new UnauthorizedException(`User with email ${dto.email} not found`);
     return user;
   }
 
-  async writePlatform(platform: string, id: number) {
-    // get platform and rewrite platforms field in DB
-    const platformsObj = await this.prisma.user.findUnique({
-      where: { id },
-      select: { platforms: true },
+  async createAccount(profile: any, userId: number) {
+    await this.prisma.account.create({
+      data: {
+        provider: profile.provider,
+        providerId: profile.providerId,
+        userId,
+      },
     });
-    const platforms = platformsObj?.platforms;
+  }
 
-    if (platforms && !platforms.includes(platform)) {
-      platformsObj.platforms.push(platform);
-      await this.prisma.user.update({
-        where: { id },
-        data: { platforms },
-      });
-    }
+  async updateUser(data: OAuthProfileType, platform?: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email: data.email },
+    });
+    if (!user) throw new UnauthorizedException('User not found');
+
+    data.provider = data.provider ? data.provider : 'CREDENTIALS';
+    const isVerified = user.isVerified ? true : data.isEmailVerified;
+
+    const methods: AuthProviders[] = Array.from(
+      new Set([...user.methods, data.provider])
+    );
+
+    const platforms: string[] = platform
+      ? Array.from(new Set([...user.platforms, platform]))
+      : user.platforms;
+
+    await this.prisma.user.update({
+      where: { email: user.email },
+      data: {
+        isVerified,
+        picture: data.picture,
+        methods,
+        platforms,
+      },
+    });
   }
 }

@@ -7,10 +7,14 @@ import { JwtModule } from '@nestjs/jwt';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
-import { SessionModule } from './session/session.module';
+import { ConfigModule } from '@nestjs/config';
+import { TokenDBModule } from './tokendb/tokendb.module';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
     ThrottlerModule.forRoot({
       throttlers: [
         {
@@ -24,17 +28,13 @@ import { SessionModule } from './session/session.module';
     AuthModule,
     TokenModule,
     UserModule,
-    SessionModule,
+    TokenDBModule
   ],
   providers: [
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
-    // {
-    //   provide: APP_GUARD,
-    //   useClass: AuthGuard,
-    // },
   ],
 })
 export class AppModule { }

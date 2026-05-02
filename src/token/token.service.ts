@@ -6,31 +6,30 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { Request, Response } from 'express';
 import * as bcrypt from 'bcrypt';
-import { Roles } from '@prisma/client';
 import { randomUUID } from 'crypto';
-import { SessionService } from 'src/session/session.service';
-
-export interface jwtPayloadType {
-  sub: number;
-  email: string;
-  roles: Roles[];
-  jti?: string;
-  exp?: string;
-  iat?: string;
-}
+import { jwtPayloadInterface } from 'src/libs/common/interfaces/jwtPayload.interface';
+import {
+  REFRESH_TOKEN_EXPIRES_IN,
+  REFRESH_TOKEN_EXPIRES_IN_SECONDS,
+  ACCESS_TOKEN_EXPIRES_IN,
+} from 'src/libs/common/constraints/tokens.const';
+import { TokenDBService } from 'src/tokendb/tokendb.service';
+import { AuthProviders, RefreshToken, User } from '@prisma/client';
 
 @Injectable()
 export class TokenService {
   constructor(
     private readonly jwt: JwtService,
-    private readonly session: SessionService
+    private readonly tokendb: TokenDBService
   ) { }
 
-  async handleTokenReuse(refreshToken: string, payload: jwtPayloadType) {
+  async handleTokenReuse(refreshToken: string, payload: jwtPayloadInterface) {
     // JWT checks
-    const tokens = await this.session.getTokensById(payload.sub);
+    const tokens = await this.tokendb.getTokensById(payload.sub);
     // revokedAt null means that the token is active, if we have revoke date setted therefore it's not
-    const matchedToken = tokens.find((token) => token.jti === payload.jti);
+    const matchedToken = tokens.find(
+      (token: RefreshToken) => token.jti === payload.jti
+    );
 
     // If token not passsed compare stage there's a possibility that token was stolen,
     // so we revoke old token and re-login user
@@ -54,7 +53,7 @@ export class TokenService {
       throw new UnauthorizedException(
         'Field refreshToken missing in your cookies'
       );
-    let payload: jwtPayloadType;
+    let payload: jwtPayloadInterface;
 
     try {
       payload = await this.jwt.verify(refreshToken, {
@@ -69,11 +68,10 @@ export class TokenService {
 
   async signToken(
     res: Response,
-    payload: jwtPayloadType,
+    payload: jwtPayloadInterface,
     platform?: string,
     oldRefreshToken?: string
   ): Promise<{ accessToken: string }> {
-    // Session_ID
     const jti = randomUUID();
     // generate new tokens
     // remove exp and iat from payload, because we will generate new ones
@@ -83,25 +81,27 @@ export class TokenService {
     // we set jti to tan compare it with writes it our DB
     const newRefreshToken = await this.jwt.signAsync(refreshPayload, {
       secret: process.env.JWT_SECRET_REFRESH,
-      expiresIn: '7d',
+      expiresIn: REFRESH_TOKEN_EXPIRES_IN,
     });
 
     // here we don't use jti because we don't need to compare accessToken
     const accessToken = await this.jwt.signAsync(accessPayload, {
       secret: process.env.JWT_SECRET_ACCESS,
-      expiresIn: '15m',
+      expiresIn: ACCESS_TOKEN_EXPIRES_IN,
     });
+
     // remove old and create new token
     // if we login in first time, oldRefreshToken will be null, so we will not remove it
-    if (oldRefreshToken) await this.session.removeToken(payload, platform);
-    await this.session.createToken(newRefreshToken, refreshPayload, platform);
+    if (oldRefreshToken)
+      await this.tokendb.removeToken(payload, false, platform);
+    await this.tokendb.createToken(newRefreshToken, refreshPayload, platform);
 
     // send tokens to user
     res.cookie('refreshToken', newRefreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: REFRESH_TOKEN_EXPIRES_IN_SECONDS,
     });
     return { accessToken };
   }

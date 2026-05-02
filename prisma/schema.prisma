@@ -15,8 +15,20 @@ enum Roles {
   ADMIN
 }
 
-model RefreshTokens {
-  id        Int      @id @default(autoincrement())
+enum AuthProviders {
+  CREDENTIALS
+  GOOGLE
+  GITHUB
+}
+
+enum VerificationTokenType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+  TWO_FACTOR_AUTH
+}
+
+model RefreshToken {
+  jti       String   @unique()
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt()
 
@@ -24,10 +36,11 @@ model RefreshTokens {
   expiresAt DateTime
   revokedAt DateTime?
   tokenHash String?
-  jti       String    @unique()
 
   userId Int
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User @relation(fields: [userId], references: [id])
+
+  @@map("refresh_tokens")
 }
 
 model User {
@@ -35,30 +48,35 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt()
 
-  refreshTokens RefreshTokens[]
-
   platforms String[]
   roles     Roles[]  @default([USER])
   fullname  String?
   email     String   @unique()
-  hash      String
+  hash      String?
+  picture   String?
 
-  bookmarks Bookmark[]
+  refreshTokens RefreshToken[]
+
+  isVerified         Boolean @default(false)
+  isTwoFactorEnabled Boolean @default(false)
+
+  methods  AuthProviders[] @default([])
+  accounts Account[]
 
   @@map("users")
 }
 
-model Bookmark {
+model Account {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt()
 
-  title       String
-  description String?
-  link        String
+  provider   String
+  providerId String
 
-  userId Int
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int
 
-  @@map("bookmarks")
+  @@unique([provider, providerId])
+  @@map("accounts")
 }

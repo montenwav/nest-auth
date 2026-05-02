@@ -3,19 +3,26 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { UserModule } from 'src/user/user.module';
 import { TokenModule } from 'src/token/token.module';
-import { APP_GUARD } from '@nestjs/core';
-import { AuthGuard } from './guards/auth.guard';
-import { SessionModule } from 'src/session/session.module';
+import { GoogleRecaptchaModule } from '@nestlab/google-recaptcha';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { recaptchaConfig } from 'src/config/recaptcha.config';
+import { GoogleStrategy } from './strategy/google.strategy';
+import { PassportModule } from '@nestjs/passport';
+import { TokenDBModule } from 'src/tokendb/tokendb.module';
 
 @Module({
-  imports: [SessionModule, UserModule, TokenModule],
-  controllers: [AuthController],
-  providers: [
-    AuthService,
-    // {
-    //   provide: APP_GUARD,
-    //   useClass: AuthGuard,
-    // },
+  imports: [
+    PassportModule,
+    GoogleRecaptchaModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: recaptchaConfig,
+      inject: [ConfigService],
+    }),
+    TokenDBModule,
+    UserModule,
+    TokenModule,
   ],
+  controllers: [AuthController],
+  providers: [AuthService, GoogleStrategy],
 })
 export class AuthModule { }
