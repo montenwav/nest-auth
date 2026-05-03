@@ -19,7 +19,7 @@ import { TokenDBModule } from './tokendb/tokendb.module';
       throttlers: [
         {
           ttl: 60000,
-          limit: 10,
+          limit: 20,
         },
       ],
     }),
@@ -28,7 +28,7 @@ import { TokenDBModule } from './tokendb/tokendb.module';
     AuthModule,
     TokenModule,
     UserModule,
-    TokenDBModule
+    TokenDBModule,
   ],
   providers: [
     {

@@ -43,9 +43,7 @@ export class UserService {
     } catch {
       // Forbid credentials when there's OAuth account
       if (provider === 'CREDENTIALS')
-        throw new UnauthorizedException(
-          'Credentials taken, use Google/GitHub instead'
-        );
+        throw new UnauthorizedException('User not found');
       return null;
     }
     return account;

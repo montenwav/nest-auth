@@ -11,16 +11,16 @@ export class TokenDBService {
   constructor(private readonly prisma: PrismaService) { }
 
   async getTokensById(id: number): Promise<RefreshToken[]> {
-    const tokens = await this.prisma.user.findFirst({
+    const user = await this.prisma.user.findFirst({
       where: { AND: [{ id }, { methods: { has: AuthProviders.CREDENTIALS } }] },
       select: {
         id: true,
         refreshTokens: true,
       },
     });
-    if (!tokens) throw new UnauthorizedException(`Token not found`);
+    if (!user) throw new UnauthorizedException(`Token not found`);
     // get values from refreshTokens field
-    return tokens[0].accounts.refreshTokens as RefreshToken[];
+    return user.refreshTokens;
   }
 
   async createToken(
@@ -51,6 +51,7 @@ export class TokenDBService {
     logout = false,
     platform?: string
   ) {
+    if (!payload.jti) throw new UnauthorizedException(`Token doesn't exist`);
     if (payload.jti) {
       await this.prisma.refreshToken.update({
         where: { jti: payload.jti },
@@ -64,6 +65,19 @@ export class TokenDBService {
           },
           data: { revokedAt: new Date() },
         });
+
+        const user = await this.prisma.user.findUnique({
+          where: { id: payload.sub },
+        });
+        if (user) {
+          const platforms = user.platforms.filter((item) => item != platform);
+          await this.prisma.user.update({
+            where: { id: user.id },
+            data: {
+              platforms,
+            },
+          });
+        }
       }
     }
   }

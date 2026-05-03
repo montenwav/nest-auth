@@ -36,15 +36,16 @@ export class AuthService {
   async refresh(res: Response, req: Request) {
     const platform = req.headers['user-agent'];
 
-    const { refreshToken, payload } = await this.token.verifyToken(req);
-    await this.token.handleTokenReuse(refreshToken, payload);
+    const { refreshToken: oldRefreshToken, payload } =
+      await this.token.verifyToken(req);
+    await this.token.handleTokenReuse(oldRefreshToken, payload);
 
     // revoke old token and sign new
     const { accessToken } = await this.token.signToken(
       res,
       payload,
       platform,
-      refreshToken
+      oldRefreshToken
     );
     // we use express res instead of return, we need to send response manually
     res.status(201).json({ accessToken });
@@ -91,10 +92,8 @@ export class AuthService {
 
   async login(res: Response, req: Request, dto?: LoginUserDto) {
     const platform = req.headers['user-agent'];
-
     // dto for credentials or req.user for OAuth
-    let data: CheckAccountsType = (req.user as OAuthProfileType) ?? dto;
-    const user = await this.checkAccounts(data, platform);
+    const user = await this.checkAccounts(dto as CheckAccountsType, platform);
 
     // send tokens to user
     const payload: jwtPayloadInterface = {
@@ -105,6 +104,30 @@ export class AuthService {
     // we don't send refresh token on login because we don't have it on that stage
     const { accessToken } = await this.token.signToken(res, payload, platform);
     res.json({ accessToken });
+  }
+
+  async googleLogin(
+    res: Response,
+    req: Request
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    const platform = req.headers['user-agent'];
+    // dto for credentials or req.user for OAuth
+    let data: CheckAccountsType = req.user as OAuthProfileType;
+    const user = await this.checkAccounts(data, platform);
+
+    // send tokens to user
+    const payload: jwtPayloadInterface = {
+      sub: user.id,
+      email: user.email,
+      roles: user.roles,
+    };
+    // we don't send refresh token on login because we don't have it on that stage
+    const { accessToken, refreshToken } = await this.token.signToken(
+      res,
+      payload,
+      platform
+    );
+    return { accessToken, refreshToken };
   }
 
   async logout(res: Response, req: Request, killDevice: boolean = false) {

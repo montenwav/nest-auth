@@ -14,7 +14,7 @@ import {
   ACCESS_TOKEN_EXPIRES_IN,
 } from 'src/libs/common/constraints/tokens.const';
 import { TokenDBService } from 'src/tokendb/tokendb.service';
-import { AuthProviders, RefreshToken, User } from '@prisma/client';
+import { RefreshToken } from '@prisma/client';
 
 @Injectable()
 export class TokenService {
@@ -71,7 +71,7 @@ export class TokenService {
     payload: jwtPayloadInterface,
     platform?: string,
     oldRefreshToken?: string
-  ): Promise<{ accessToken: string }> {
+  ): Promise<{ accessToken: string; refreshToken: string }> {
     const jti = randomUUID();
     // generate new tokens
     // remove exp and iat from payload, because we will generate new ones
@@ -89,7 +89,6 @@ export class TokenService {
       secret: process.env.JWT_SECRET_ACCESS,
       expiresIn: ACCESS_TOKEN_EXPIRES_IN,
     });
-
     // remove old and create new token
     // if we login in first time, oldRefreshToken will be null, so we will not remove it
     if (oldRefreshToken)
@@ -103,6 +102,6 @@ export class TokenService {
       sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
       maxAge: REFRESH_TOKEN_EXPIRES_IN_SECONDS,
     });
-    return { accessToken };
+    return { accessToken, refreshToken: newRefreshToken };
   }
 }
