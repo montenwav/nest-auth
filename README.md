@@ -5,10 +5,11 @@ with react frontend
 ### Clone
 ```
 git clone git@github.com:montenwav/nest-auth.git
+cd nest-auth
 ```
 
 ### Docker
 ```
-docker build -t nest-auth .
+docker compose build
 docker compose up -d
 ```
