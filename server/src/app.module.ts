@@ -9,9 +9,12 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { ConfigModule } from '@nestjs/config';
 import { TokenDBModule } from './tokendb/tokendb.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { TokenCleanupService } from './token-cleanup.service';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
     }),
@@ -19,7 +22,7 @@ import { TokenDBModule } from './tokendb/tokendb.module';
       throttlers: [
         {
           ttl: 60000,
-          limit: 20,
+          limit: 50,
         },
       ],
     }),
@@ -35,6 +38,7 @@ import { TokenDBModule } from './tokendb/tokendb.module';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
+    TokenCleanupService,
   ],
 })
 export class AppModule { }

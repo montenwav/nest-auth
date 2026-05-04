@@ -1,0 +1,48 @@
+.profile {
+  align-items: center;
+  display: flex;
+  gap: 25px;
+  padding: 20px;
+}
+
+.profile p {
+  margin-bottom: 5px;
+  font-size: 1.1em;
+  font-weight: bold;
+}
+
+.jaba {
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.jaba > p {
+  font-size: 1.5em;
+  font-weight: bold;
+  width: 700px;
+}
+
+.jaba > img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 30%;
+  height: auto;
+  border-radius: 15px;
+  cursor: pointer;
+}
+
+.container {
+  background-image: radial-gradient(
+      circle at 25% 25%,
+      #1a1a2e 0%,
+      transparent 50%
+    ),
+    radial-gradient(circle at 75% 75%, #16213e 0%, transparent 50%);
+  height: 100vh;
+  position: relative;
+}

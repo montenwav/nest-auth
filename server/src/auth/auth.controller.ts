@@ -28,7 +28,7 @@ export class AuthController {
   constructor(
     private readonly user: UserService,
     private readonly authService: AuthService,
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService
   ) { }
 
   @Get('refresh')
@@ -36,13 +36,13 @@ export class AuthController {
     return this.authService.refresh(res, req);
   }
 
-  @Recaptcha()
+  // @Recaptcha()
   @Post('register')
   register(@Body() dto: RegisterUserDto) {
     return this.authService.register(dto);
   }
 
-  @Recaptcha()
+  // @Recaptcha()
   @Post('login')
   login(@Res() res: Response, @Req() req: Request, @Body() dto: LoginUserDto) {
     return this.authService.login(res, req, dto);
