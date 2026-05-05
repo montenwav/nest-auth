@@ -88,10 +88,11 @@ export class AuthService {
     let user: any | null = null;
     // If account doesn't exist we search for user by email
     // If user doesn't exist we create a new user with linked account
-    let account: any = await this.user.getAccountByProviderId(
+    let account: any | null = await this.user.getAccountByProviderId(
       data.provider,
       data.providerId
     );
+
     if (account) user = account.user;
 
     user = await this.user.getUserByEmail(data.email);
@@ -105,6 +106,7 @@ export class AuthService {
     ) {
       await this.user.createAccount(data, account.userId);
     }
+
     await this.user.updateUser(data as OAuthProfileType, platform);
 
     // send tokens to user
