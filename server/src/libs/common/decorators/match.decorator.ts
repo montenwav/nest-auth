@@ -1,17 +1,32 @@
 import {
+  registerDecorator,
+  ValidationOptions,
   ValidatorConstraint,
-  ValidationArguments,
   ValidatorConstraintInterface,
+  ValidationArguments,
 } from 'class-validator';
 
 @ValidatorConstraint({ name: 'Match' })
-export class Match implements ValidatorConstraintInterface {
-  validate(value: string, args: ValidationArguments) {
-    const { passwordConfirm } = args.object as any;
-    return passwordConfirm === value;
+export class MatchConstraint implements ValidatorConstraintInterface {
+  validate(value: any, args: ValidationArguments) {
+    const [relatedPropertyName] = args.constraints;
+    const relatedValue = (args.object as any)[relatedPropertyName];
+    return value === relatedValue;
   }
 
-  defaultMessage() {
-    return `Password doesn't match`;
+  defaultMessage(args: ValidationArguments) {
+    return `${args.property} must match ${args.constraints[0]}`;
   }
+}
+
+export function Match(property: string, validationOptions?: ValidationOptions) {
+  return (object: any, propertyName: string) => {
+    registerDecorator({
+      target: object.constructor,
+      propertyName: propertyName,
+      options: validationOptions,
+      constraints: [property],
+      validator: MatchConstraint,
+    });
+  };
 }

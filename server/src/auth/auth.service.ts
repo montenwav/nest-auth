@@ -10,11 +10,11 @@ import { TokenService } from 'src/token/token.service';
 import { UserService } from 'src/user/user.service';
 import { RegisterUserDto } from './dto/RegisterUser.dto';
 import { jwtPayloadInterface } from 'src/libs/common/interfaces/jwtPayload.interface';
-import { User } from '@prisma/client';
 import { OAuthProfileType } from './types/oAuthProfile.type';
 import { CreateUserType } from './types/createUser.type';
 import { CheckAccountsType } from './types/checkAccounts.type';
 import { TokenDBService } from 'src/tokendb/tokendb.service';
+import { Account } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -38,6 +38,7 @@ export class AuthService {
 
     const { refreshToken: oldRefreshToken, payload } =
       await this.token.verifyToken(req);
+
     await this.token.handleTokenReuse(oldRefreshToken, payload);
 
     // revoke old token and sign new
@@ -51,69 +52,60 @@ export class AuthService {
     res.status(201).json({ accessToken });
   }
 
-  async checkAccounts(
-    data: CheckAccountsType,
-    platform?: string
-  ): Promise<User> {
-    // If account doesn't exist (may include OAuth or Credentials)
-    // we search for user by email and check password
-    // If user doesn't exist we create a new user with linked account
-    let account: any = await this.user.getAccountByProviderId(
-      (data as OAuthProfileType).provider || 'CREDENTIALS', // OAuth provider or Credentials login
-      (data as OAuthProfileType).providerId || data.email // OAuth providerId or email for Credentials
-    );
-
-    // Return only when email is verified
-    if (account) {
-      await this.user.updateUser(data as OAuthProfileType, platform);
-      if ((data as OAuthProfileType).isEmailVerified) {
-        return account.user;
-      }
-    }
-
-    let user = await this.user.getUserByEmail((data as LoginUserDto).email);
-    if (user && user.hash && (data as LoginUserDto).password) {
-      const passCheck = await bcrypt.compare(
-        (data as LoginUserDto).password,
-        user.hash || ''
-      );
-      if (!passCheck) throw new UnauthorizedException('Password is incorrect');
-      return user;
-    }
-
-    if (!user) {
-      user = await this.user.createUser(data as CreateUserType);
-      return user;
-    }
-
-    await this.user.createAccount(data, user.id);
-    return user;
-  }
-
-  async login(res: Response, req: Request, dto?: LoginUserDto) {
+  async login(res: Response, req: Request, dto: LoginUserDto) {
     const platform = req.headers['user-agent'];
-    // dto for credentials or req.user for OAuth
-    const user = await this.checkAccounts(dto as CheckAccountsType, platform);
+    const data = {
+      provider: 'CREDENTIALS', // OAuth provider or Credentials login
+      providerId: dto.email, // OAuth providerId or email for Credentials
+    };
 
-    // send tokens to user
+    let user: any = await this.user.getUserByEmail(dto.email);
+    if (!user)
+      throw new UnauthorizedException('User not found, please sign up');
+
+    if (!user.hash) throw new UnauthorizedException('Use Google sign in');
+
+    if (user.hash && dto.password) {
+      const passCheck = await bcrypt.compare(dto.password, user.hash);
+      if (!passCheck) throw new UnauthorizedException('Password is incorrect');
+    }
+
+    await this.user.updateUser(data as OAuthProfileType, platform);
+
     const payload: jwtPayloadInterface = {
       sub: user.id,
       email: user.email,
       roles: user.roles,
     };
-    // we don't send refresh token on login because we don't have it on that stage
+
     const { accessToken } = await this.token.signToken(res, payload, platform);
     res.json({ accessToken });
   }
 
-  async googleLogin(
-    res: Response,
-    req: Request
-  ): Promise<{ accessToken: string; refreshToken: string }> {
+  async googleLogin(res: Response, req: Request) {
     const platform = req.headers['user-agent'];
-    // dto for credentials or req.user for OAuth
     let data: CheckAccountsType = req.user as OAuthProfileType;
-    const user = await this.checkAccounts(data, platform);
+    let user: any | null = null;
+    // If account doesn't exist we search for user by email
+    // If user doesn't exist we create a new user with linked account
+    let account: any = await this.user.getAccountByProviderId(
+      data.provider,
+      data.providerId
+    );
+    if (account) user = account.user;
+
+    user = await this.user.getUserByEmail(data.email);
+    if (!user) await this.user.createUser(data as CreateUserType);
+    // If user exists but doesn't have account with such provider,
+    // we create new account for that user
+    if (
+      user.accounts.some((acc: Account) => {
+        acc.provider != (data as OAuthProfileType).provider;
+      })
+    ) {
+      await this.user.createAccount(data, account.userId);
+    }
+    await this.user.updateUser(data as OAuthProfileType, platform);
 
     // send tokens to user
     const payload: jwtPayloadInterface = {
@@ -121,13 +113,7 @@ export class AuthService {
       email: user.email,
       roles: user.roles,
     };
-    // we don't send refresh token on login because we don't have it on that stage
-    const { accessToken, refreshToken } = await this.token.signToken(
-      res,
-      payload,
-      platform
-    );
-    return { accessToken, refreshToken };
+    await this.token.signRefreshToken(res, payload, platform);
   }
 
   async logout(res: Response, req: Request, killDevice: boolean = false) {

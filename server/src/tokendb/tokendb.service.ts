@@ -4,7 +4,6 @@ import { jwtPayloadInterface } from 'src/libs/common/interfaces/jwtPayload.inter
 import * as bcrypt from 'bcrypt';
 import { REFRESH_TOKEN_EXPIRES_IN_MILLISECONDS } from 'src/libs/common/constraints/tokens.const';
 import { RefreshToken } from '@prisma/client';
-import { AuthProviders } from 'src/libs/common/enums/AuthProviders.enum';
 
 @Injectable()
 export class TokenDBService {
@@ -12,7 +11,7 @@ export class TokenDBService {
 
   async getTokensById(id: number): Promise<RefreshToken[]> {
     const user = await this.prisma.user.findFirst({
-      where: { AND: [{ id }, { methods: { has: AuthProviders.CREDENTIALS } }] },
+      where: { id },
       select: {
         id: true,
         refreshTokens: true,

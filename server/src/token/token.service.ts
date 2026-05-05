@@ -104,4 +104,29 @@ export class TokenService {
     });
     return { accessToken, refreshToken: newRefreshToken };
   }
+
+  async signRefreshToken(
+    res: Response,
+    payload: jwtPayloadInterface,
+    platform?: string
+  ) {
+    const jti = randomUUID();
+    const { exp, iat, ...accessPayload } = payload;
+    const refreshPayload = { ...accessPayload, jti };
+
+    const newRefreshToken = await this.jwt.signAsync(refreshPayload, {
+      secret: process.env.JWT_SECRET_REFRESH,
+      expiresIn: REFRESH_TOKEN_EXPIRES_IN,
+    });
+
+    await this.tokendb.createToken(newRefreshToken, refreshPayload, platform);
+
+    // send tokens to user
+    res.cookie('refreshToken', newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+      maxAge: REFRESH_TOKEN_EXPIRES_IN_SECONDS,
+    });
+  }
 }

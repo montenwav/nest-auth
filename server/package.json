@@ -8,8 +8,8 @@
   "scripts": {
     "prisma:dev": "prisma migrate deploy",
     "prisma:test": "dotenv -e .env.test -- prisma migrate deploy",
-    "prebuild": "rm -rf dist && npm run prisma:dev",
-    "build": "nest build && npm run start:dev",
+    "prebuild": "rm -rf dist",
+    "build": "npm run prisma:dev && nest build && npm run start:dev",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",

@@ -68,7 +68,7 @@ export class AuthController {
   @UseGuards(AuthGuard('google'))
   async googleCallback(@Res() res: Response, @Req() req: Request) {
     await this.authService.googleLogin(res, req);
-    return res.redirect(`${this.configService.get('CORS_ORIGIN')}`);
+    res.redirect(`${this.configService.get('CORS_ORIGIN')}`);
   }
 
   @UseGuards(AuthenticateGuard)

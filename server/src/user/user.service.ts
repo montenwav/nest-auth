@@ -34,19 +34,11 @@ export class UserService {
     provider: string,
     providerId: string
   ): Promise<Account | null> {
-    let account: Account | null = null;
-    try {
-      account = await this.prisma.account.findFirstOrThrow({
-        where: { AND: [{ provider }, { providerId }] },
-        include: { user: true },
-      });
-    } catch {
-      // Forbid credentials when there's OAuth account
-      if (provider === 'CREDENTIALS')
-        throw new UnauthorizedException('User not found');
-      return null;
-    }
-    return account;
+    let account = await this.prisma.account.findFirst({
+      where: { AND: [{ provider }, { providerId }] },
+      include: { user: true },
+    });
+    return account ?? null;
   }
 
   async createUser(dto: CreateUserType): Promise<User> {
@@ -54,7 +46,6 @@ export class UserService {
     if (dto.password) {
       hash = await bcrypt.hash(dto.password, 10);
     }
-
     // Because we don't have password in OAuth
     const accountType = {
       provider: dto.password ? 'CREDENTIALS' : dto.provider,
@@ -90,12 +81,12 @@ export class UserService {
 
   async updateUser(data: OAuthProfileType, platform?: string) {
     const user = await this.prisma.user.findUnique({
-      where: { email: data.email },
+      where: { email: data.email || data.providerId },
     });
     if (!user) throw new UnauthorizedException('User not found');
 
     data.provider = data.provider ? data.provider : 'CREDENTIALS';
-    const isVerified = user.isVerified ? true : data.isEmailVerified;
+    const isVerified = user.isVerified ? true : data.isEmailVerified ?? false;
 
     const methods: AuthProviders[] = Array.from(
       new Set([...user.methods, data.provider])
@@ -109,7 +100,7 @@ export class UserService {
       where: { email: user.email },
       data: {
         isVerified,
-        picture: data.picture,
+        picture: data.picture || null,
         methods,
         platforms,
       },

@@ -9,26 +9,18 @@ export default function Dashboard() {
   const [error, setError] = useState("");
   const { refresh, setUser, user, logout } = useAuth();
 
-  // useEffect(() => {
-  //   (async () => await checkAuth())();
-  //   if (!isAuth) navigate("/login");
-  // }, [isAuth]);
-
   useEffect(() => {
     if (
       error == "token not found" ||
-      error == "Field refreshToken missing in your cookies" ||
-      error == "jwt expired"
+      error == "Field refreshToken missing in your cookies"
     ) {
       navigate("/login");
     }
-    // if (error == "jwt expired") {
-    //   async () => await refresh();
-    //   navigate("/login");
-    // }
+    if (error == "jwt expired") {
+      async () => await refresh();
+      navigate("/login");
+    }
   }, [error]);
-  //
-  // console.log(`error: ${error}`);
 
   useEffect(() => {
     API.get("/auth/user")
